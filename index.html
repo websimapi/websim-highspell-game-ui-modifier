@@ -350,6 +350,19 @@
                 gameIframe.src = gameIframe.src;
             });
 
+            // Add a helper function to clean up JSON responses
+            function cleanupJsonResponse(response) {
+                // Remove markdown code block formatting if present
+                let cleaned = response;
+                
+                // Check for ```json or ``` at the start and end
+                cleaned = cleaned.replace(/^```json\s+/g, '');
+                cleaned = cleaned.replace(/^```\s+/g, '');
+                cleaned = cleaned.replace(/\s+```$/g, '');
+                
+                return cleaned;
+            }
+
             // Process the modification request using LLM
             analyzeButton.addEventListener('click', async () => {
                 const userRequest = modificationRequest.value.trim();
@@ -370,7 +383,7 @@
                                 content: `You are an expert in web development and UI modifications for browser games.
                                 You're helping a user modify the UI of the Highspell game (https://highspell.com/game).
                                 
-                                Respond with a JSON object with the following structure:
+                                Respond with a strict JSON object with the following structure:
                                 {
                                     "analysis": "Brief analysis of the request and what elements might need to be targeted",
                                     "cssCode": "CSS code to implement the modification",
@@ -379,7 +392,8 @@
                                     "implementation": "How to implement the code (developer tools, userscript, or bookmarklet)"
                                 }
                                 
-                                Make sure all code is properly escaped for JSON and ready to execute in the browser.`
+                                Make sure all code is properly escaped for JSON and ready to execute in the browser.
+                                DO NOT wrap your response in markdown code blocks or backticks.`
                             },
                             {
                                 role: "user",
@@ -391,8 +405,19 @@
                         json: true
                     });
 
-                    // Parse the JSON response
-                    const response = JSON.parse(completion.content);
+                    // Parse the JSON response - Add proper error handling
+                    let jsonData;
+                    try {
+                        // First attempt direct parsing
+                        jsonData = JSON.parse(completion.content);
+                    } catch (parseError) {
+                        console.log("Initial JSON parse failed, attempting cleanup:", parseError);
+                        // If direct parsing fails, clean up potential markdown and try again
+                        const cleanedContent = cleanupJsonResponse(completion.content);
+                        jsonData = JSON.parse(cleanedContent);
+                    }
+                    
+                    const response = jsonData;
                     
                     // Create a formatted HTML response
                     let formattedResponse = `
@@ -461,7 +486,7 @@
                                 content: `You are an expert in web development and UI modifications for browser games.
                                 Generate a code template for modifying the Highspell game (https://highspell.com/game) using the ${implementationMethod} approach.
                                 
-                                Respond with a JSON object with the following structure:
+                                Respond with a strict JSON object with the following structure:
                                 {
                                     "templateType": "${implementationMethod}",
                                     "templateCode": "Complete code template with comments",
@@ -474,7 +499,8 @@
                                     ]
                                 }
                                 
-                                Make sure all code is properly escaped for JSON.`
+                                Make sure all code is properly escaped for JSON.
+                                DO NOT wrap your response in markdown code blocks or backticks.`
                             },
                             {
                                 role: "user",
@@ -484,8 +510,19 @@
                         json: true
                     });
 
-                    // Parse the JSON response
-                    const response = JSON.parse(completion.content);
+                    // Parse the JSON response with error handling
+                    let jsonData;
+                    try {
+                        // First attempt direct parsing
+                        jsonData = JSON.parse(completion.content);
+                    } catch (parseError) {
+                        console.log("Initial JSON parse failed, attempting cleanup:", parseError);
+                        // If direct parsing fails, clean up potential markdown and try again
+                        const cleanedContent = cleanupJsonResponse(completion.content);
+                        jsonData = JSON.parse(cleanedContent);
+                    }
+                    
+                    const response = jsonData;
                     
                     // Create a formatted HTML response
                     let formattedResponse = `
@@ -558,7 +595,7 @@
                                 content: `You are an expert in web development and UI modifications for browser games.
                                 Generate executable code that can modify the Highspell game UI based on the user's request.
                                 
-                                Respond with a JSON object with the following structure:
+                                Respond with a strict JSON object with the following structure:
                                 {
                                     "codeType": "${selectedCodeType}",
                                     "cssCode": ${selectedCodeType === 'css' || selectedCodeType === 'combined' ? '"CSS code for the modification"' : 'null'},
@@ -567,6 +604,7 @@
                                 }
                                 
                                 Make sure all code is properly escaped for JSON and ready to execute in the browser.
+                                DO NOT wrap your response in markdown code blocks or backticks.
                                 
                                 For JavaScript:
                                 - Use a self-executing function to avoid global namespace pollution: (function() { ... })();
@@ -585,8 +623,19 @@
                         json: true
                     });
                     
-                    // Parse the JSON response
-                    const response = JSON.parse(completion.content);
+                    // Parse the JSON response with error handling
+                    let jsonData;
+                    try {
+                        // First attempt direct parsing
+                        jsonData = JSON.parse(completion.content);
+                    } catch (parseError) {
+                        console.log("Initial JSON parse failed, attempting cleanup:", parseError);
+                        // If direct parsing fails, clean up potential markdown and try again
+                        const cleanedContent = cleanupJsonResponse(completion.content);
+                        jsonData = JSON.parse(cleanedContent);
+                    }
+                    
+                    const response = jsonData;
                     
                     // Determine which code to use based on type
                     let finalCode = '';
