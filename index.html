@@ -451,15 +451,21 @@
                     
                     // Add event listeners for the apply buttons
                     if (response.cssCode) {
-                        document.getElementById('apply-css-now').addEventListener('click', () => {
-                            injectCssIntoIframe(response.cssCode);
-                        });
+                        const applyCssButton = document.getElementById('apply-css-now');
+                        if (applyCssButton) {
+                            applyCssButton.addEventListener('click', () => {
+                                injectCssIntoIframe(response.cssCode);
+                            });
+                        }
                     }
                     
                     if (response.jsCode) {
-                        document.getElementById('apply-js-now').addEventListener('click', () => {
-                            injectScriptIntoIframe(response.jsCode);
-                        });
+                        const applyJsButton = document.getElementById('apply-js-now');
+                        if (applyJsButton) {
+                            applyJsButton.addEventListener('click', () => {
+                                injectScriptIntoIframe(response.jsCode);
+                            });
+                        }
                     }
                 } catch (error) {
                     console.error('Error:', error);
@@ -472,8 +478,13 @@
             
             // Generate code template based on the selected implementation method
             generateCodeButtonTools.addEventListener('click', async () => {
-                const implementationMethod = document.querySelector('input[name="implementation"]:checked').value;
+                const implementationMethod = document.querySelector('input[name="implementation"]:checked');
+                if (!implementationMethod) {
+                    showResultMessage('Please select an implementation method', true);
+                    return;
+                }
                 
+                const method = implementationMethod.value;
                 codeTemplateContainer.style.display = 'none';
                 loading.style.display = 'block';
                 
@@ -484,11 +495,11 @@
                             {
                                 role: "system",
                                 content: `You are an expert in web development and UI modifications for browser games.
-                                Generate a code template for modifying the Highspell game (https://highspell.com/game) using the ${implementationMethod} approach.
+                                Generate a code template for modifying the Highspell game (https://highspell.com/game) using the ${method} approach.
                                 
                                 Respond with a strict JSON object with the following structure:
                                 {
-                                    "templateType": "${implementationMethod}",
+                                    "templateType": "${method}",
                                     "templateCode": "Complete code template with comments",
                                     "explanation": "Explanation of how to use the template",
                                     "examples": [
@@ -504,7 +515,7 @@
                             },
                             {
                                 role: "user",
-                                content: `Please generate a detailed code template for the ${implementationMethod} approach for modifying the Highspell game UI. Include specific examples that users might want (like changing colors, repositioning elements, etc).`
+                                content: `Please generate a detailed code template for the ${method} approach for modifying the Highspell game UI. Include specific examples that users might want (like changing colors, repositioning elements, etc).`
                             }
                         ],
                         json: true
@@ -550,14 +561,14 @@
                     document.querySelectorAll('.apply-example-btn').forEach(button => {
                         button.addEventListener('click', () => {
                             const code = decodeURIComponent(button.getAttribute('data-code'));
-                            if (implementationMethod === 'devtools' || implementationMethod === 'userscript') {
+                            if (method === 'devtools' || method === 'userscript') {
                                 // Determine if it's likely CSS or JS
                                 if (code.includes('style') || code.includes('{') && code.includes('}') && code.includes(':')) {
                                     injectCssIntoIframe(code);
                                 } else {
                                     injectScriptIntoIframe(code);
                                 }
-                            } else if (implementationMethod === 'bookmarklet') {
+                            } else if (method === 'bookmarklet') {
                                 createAndClickBookmarklet(code);
                             }
                         });
@@ -572,75 +583,76 @@
             });
             
             // New function to generate code for applying UI modifications
-            document.getElementById('generate-code-button').addEventListener('click', async () => {
-                const userRequest = applyRequest.value.trim();
-                const selectedCodeType = codeType.value;
-                
-                if (!userRequest) {
-                    alert('Please enter a modification request');
-                    return;
-                }
-                
-                applyLoading.style.display = 'block';
-                codeOutputContainer.style.display = 'none';
-                bookmarkletContainer.style.display = 'none';
-                resultMessage.style.display = 'none';
-                
-                try {
-                    // Use the LLM to generate executable code with JSON format
-                    const completion = await websim.chat.completions.create({
-                        messages: [
-                            {
-                                role: "system",
-                                content: `You are an expert in web development and UI modifications for browser games.
-                                Generate executable code that can modify the Highspell game UI based on the user's request.
-                                
-                                Respond with a strict JSON object with the following structure:
-                                {
-                                    "codeType": "${selectedCodeType}",
-                                    "cssCode": ${selectedCodeType === 'css' || selectedCodeType === 'combined' ? '"CSS code for the modification"' : 'null'},
-                                    "jsCode": ${selectedCodeType === 'js' || selectedCodeType === 'combined' ? '"JavaScript code for the modification"' : 'null'},
-                                    "combinedCode": ${selectedCodeType === 'combined' ? '"Code combining both JS and CSS approaches"' : 'null'}
-                                }
-                                
-                                Make sure all code is properly escaped for JSON and ready to execute in the browser.
-                                DO NOT wrap your response in markdown code blocks or backticks.
-                                
-                                For JavaScript:
-                                - Use a self-executing function to avoid global namespace pollution: (function() { ... })();
-                                - Add proper error handling
-                                - Consider waiting for elements to load before manipulating them
-                                
-                                For CSS:
-                                - Use specific selectors to target game elements
-                                - Use !important when necessary to override existing styles`
-                            },
-                            {
-                                role: "user",
-                                content: `Generate ${selectedCodeType === 'combined' ? 'JavaScript and CSS' : selectedCodeType === 'js' ? 'JavaScript' : 'CSS'} code to apply the following UI modification to the Highspell game: ${userRequest}`
-                            }
-                        ],
-                        json: true
-                    });
+            if (generateCodeButton) {
+                generateCodeButton.addEventListener('click', async () => {
+                    const userRequest = applyRequest.value.trim();
+                    const selectedCodeType = codeType.value;
                     
-                    // Parse the JSON response with error handling
-                    let jsonData;
-                    try {
-                        // First attempt direct parsing
-                        jsonData = JSON.parse(completion.content);
-                    } catch (parseError) {
-                        console.log("Initial JSON parse failed, attempting cleanup:", parseError);
-                        // If direct parsing fails, clean up potential markdown and try again
-                        const cleanedContent = cleanupJsonResponse(completion.content);
-                        jsonData = JSON.parse(cleanedContent);
+                    if (!userRequest) {
+                        alert('Please enter a modification request');
+                        return;
                     }
                     
-                    const response = jsonData;
+                    applyLoading.style.display = 'block';
+                    codeOutputContainer.style.display = 'none';
+                    bookmarkletContainer.style.display = 'none';
+                    resultMessage.style.display = 'none';
                     
-                    // Determine which code to use based on type
-                    let finalCode = '';
-                    if (selectedCodeType === 'combined') {
-                        finalCode = response.combinedCode || `
+                    try {
+                        // Use the LLM to generate executable code with JSON format
+                        const completion = await websim.chat.completions.create({
+                            messages: [
+                                {
+                                    role: "system",
+                                    content: `You are an expert in web development and UI modifications for browser games.
+                                    Generate executable code that can modify the Highspell game UI based on the user's request.
+                                    
+                                    Respond with a strict JSON object with the following structure:
+                                    {
+                                        "codeType": "${selectedCodeType}",
+                                        "cssCode": ${selectedCodeType === 'css' || selectedCodeType === 'combined' ? '"CSS code for the modification"' : 'null'},
+                                        "jsCode": ${selectedCodeType === 'js' || selectedCodeType === 'combined' ? '"JavaScript code for the modification"' : 'null'},
+                                        "combinedCode": ${selectedCodeType === 'combined' ? '"Code combining both JS and CSS approaches"' : 'null'}
+                                    }
+                                    
+                                    Make sure all code is properly escaped for JSON and ready to execute in the browser.
+                                    DO NOT wrap your response in markdown code blocks or backticks.
+                                    
+                                    For JavaScript:
+                                    - Use a self-executing function to avoid global namespace pollution: (function() { ... })();
+                                    - Add proper error handling
+                                    - Consider waiting for elements to load before manipulating them
+                                    
+                                    For CSS:
+                                    - Use specific selectors to target game elements
+                                    - Use !important when necessary to override existing styles`
+                                },
+                                {
+                                    role: "user",
+                                    content: `Generate ${selectedCodeType === 'combined' ? 'JavaScript and CSS' : selectedCodeType === 'js' ? 'JavaScript' : 'CSS'} code to apply the following UI modification to the Highspell game: ${userRequest}`
+                                }
+                            ],
+                            json: true
+                        });
+                        
+                        // Parse the JSON response with error handling
+                        let jsonData;
+                        try {
+                            // First attempt direct parsing
+                            jsonData = JSON.parse(completion.content);
+                        } catch (parseError) {
+                            console.log("Initial JSON parse failed, attempting cleanup:", parseError);
+                            // If direct parsing fails, clean up potential markdown and try again
+                            const cleanedContent = cleanupJsonResponse(completion.content);
+                            jsonData = JSON.parse(cleanedContent);
+                        }
+                        
+                        const response = jsonData;
+                        
+                        // Determine which code to use based on type
+                        let finalCode = '';
+                        if (selectedCodeType === 'combined') {
+                            finalCode = response.combinedCode || `
 // Combined JavaScript and CSS for: ${userRequest}
 (function() {
     'use strict';
@@ -655,47 +667,50 @@ ${response.cssCode || '/* No CSS provided */'}
     // Add JavaScript
     ${response.jsCode || '// No JavaScript provided'}
 })();`;
-                    } else if (selectedCodeType === 'js') {
-                        finalCode = response.jsCode || '// No JavaScript code was generated';
-                    } else {
-                        finalCode = response.cssCode || '/* No CSS code was generated */';
+                        } else if (selectedCodeType === 'js') {
+                            finalCode = response.jsCode || '// No JavaScript code was generated';
+                        } else {
+                            finalCode = response.cssCode || '/* No CSS code was generated */';
+                        }
+                        
+                        codeEditor.value = finalCode;
+                        codeOutputContainer.style.display = 'block';
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showResultMessage(`Error: ${error.message || 'Unknown error occurred'}`, true);
+                    } finally {
+                        applyLoading.style.display = 'none';
                     }
-                    
-                    codeEditor.value = finalCode;
-                    codeOutputContainer.style.display = 'block';
-                } catch (error) {
-                    console.error('Error:', error);
-                    showResultMessage(`Error: ${error.message || 'Unknown error occurred'}`, true);
-                } finally {
-                    applyLoading.style.display = 'none';
-                }
-            });
+                });
+            }
             
             // Apply the generated code to the game iframe
-            applyCodeButton.addEventListener('click', () => {
-                const code = codeEditor.value.trim();
-                if (!code) {
-                    showResultMessage('No code to apply', true);
-                    return;
-                }
-                
-                const selectedCodeType = codeType.value;
-                
-                try {
-                    if (selectedCodeType === 'js' || selectedCodeType === 'combined') {
-                        injectScriptIntoIframe(code);
+            if (applyCodeButton) {
+                applyCodeButton.addEventListener('click', () => {
+                    const code = codeEditor.value.trim();
+                    if (!code) {
+                        showResultMessage('No code to apply', true);
+                        return;
                     }
                     
-                    if (selectedCodeType === 'css' || selectedCodeType === 'combined') {
-                        injectCssIntoIframe(extractCssFromCombined(code, selectedCodeType));
-                    }
+                    const selectedCodeType = codeType.value;
                     
-                    showResultMessage('Code applied successfully!', false);
-                } catch (error) {
-                    console.error('Error applying code:', error);
-                    showResultMessage(`Error applying code: ${error.message}`, true);
-                }
-            });
+                    try {
+                        if (selectedCodeType === 'js' || selectedCodeType === 'combined') {
+                            injectScriptIntoIframe(code);
+                        }
+                        
+                        if (selectedCodeType === 'css' || selectedCodeType === 'combined') {
+                            injectCssIntoIframe(extractCssFromCombined(code, selectedCodeType));
+                        }
+                        
+                        showResultMessage('Code applied successfully!', false);
+                    } catch (error) {
+                        console.error('Error applying code:', error);
+                        showResultMessage(`Error applying code: ${error.message}`, true);
+                    }
+                });
+            }
             
             // Extract CSS from combined code
             function extractCssFromCombined(code, type) {
@@ -708,202 +723,149 @@ ${response.cssCode || '/* No CSS provided */'}
                 return '';
             }
             
-            // Improved script injection function
+            // Improved script injection function with better error handling
             function injectScriptIntoIframe(code) {
+                if (!gameIframe || !gameIframe.contentWindow) {
+                    showResultMessage('Game iframe is not accessible', true);
+                    return;
+                }
+
                 try {
-                    // Create a unique ID for communication
-                    const messageId = 'highspell-ui-mod-' + Date.now();
-                    
-                    // Create a script element that will inject our code through postMessage
-                    const script = document.createElement('script');
-                    script.textContent = `
-                        (function() {
-                            // Listen for our specific message
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'HIGHSPELL_UI_MOD' && event.data.id === '${messageId}') {
-                                    try {
-                                        // Execute the code
-                                        const scriptEl = document.createElement('script');
-                                        scriptEl.textContent = event.data.code;
-                                        document.head.appendChild(scriptEl);
-                                        
-                                        // Remove the script element after execution
-                                        document.head.removeChild(scriptEl);
-                                        
-                                        // Send success message back
-                                        window.parent.postMessage({
-                                            type: 'HIGHSPELL_UI_MOD_RESULT',
-                                            id: '${messageId}',
-                                            success: true
-                                        }, '*');
-                                    } catch (error) {
-                                        // Send error message back
-                                        window.parent.postMessage({
-                                            type: 'HIGHSPELL_UI_MOD_RESULT',
-                                            id: '${messageId}',
-                                            success: false,
-                                            error: error.message
-                                        }, '*');
-                                    }
-                                }
-                            });
-                        })();
-                    `;
-                    
-                    // Add a listener for the response
-                    window.addEventListener('message', function responseHandler(event) {
-                        if (event.data && event.data.type === 'HIGHSPELL_UI_MOD_RESULT' && event.data.id === messageId) {
-                            // Remove this listener once we get our response
-                            window.removeEventListener('message', responseHandler);
-                            
-                            if (event.data.success) {
-                                showResultMessage('JavaScript executed successfully!', false);
-                            } else {
-                                showResultMessage(`Error executing JavaScript: ${event.data.error}`, true);
+                    // Handle iframe content loading
+                    function injectWhenReady() {
+                        try {
+                            // Check if iframe is loaded and accessible
+                            if (!gameIframe.contentWindow || !gameIframe.contentDocument) {
+                                throw new Error("Cannot access iframe content");
                             }
+
+                            // Directly inject script into iframe - safer approach
+                            const script = gameIframe.contentDocument.createElement('script');
+                            script.textContent = `
+                                try {
+                                    (function() {
+                                        ${code}
+                                    })();
+                                    console.log('Script executed successfully');
+                                } catch (error) {
+                                    console.error('Error executing script:', error);
+                                }
+                            `;
+                            gameIframe.contentDocument.head.appendChild(script);
+                            
+                            showResultMessage('JavaScript executed successfully!', false);
+                        } catch (error) {
+                            console.error('Injection error:', error);
+                            
+                            // Fallback: try using the console method
+                            const consoleScript = `
+                                const script = document.createElement('script');
+                                script.textContent = ${JSON.stringify(code)};
+                                document.head.appendChild(script);
+                            `;
+                            
+                            showResultMessage(`
+                                Due to security restrictions, please run this code in your browser console:
+                                <pre>${consoleScript}</pre>
+                                <button id="copy-console-code">Copy Console Code</button>
+                            `, false);
+                            
+                            // Add event listener to the copy button
+                            setTimeout(() => {
+                                const copyConsoleButton = document.getElementById('copy-console-code');
+                                if (copyConsoleButton) {
+                                    copyConsoleButton.addEventListener('click', () => {
+                                        navigator.clipboard.writeText(consoleScript)
+                                            .then(() => alert('Console code copied to clipboard!'))
+                                            .catch(err => console.error('Failed to copy:', err));
+                                    });
+                                }
+                            }, 100);
                         }
-                    });
-                    
-                    // Inject the listener script
-                    gameIframe.contentWindow.postMessage({
-                        type: 'INJECT_SCRIPT',
-                        script: script.textContent
-                    }, '*');
-                    
-                    // Send the code to execute
-                    setTimeout(() => {
-                        gameIframe.contentWindow.postMessage({
-                            type: 'HIGHSPELL_UI_MOD',
-                            id: messageId,
-                            code: code
-                        }, '*');
-                    }, 100);
-                    
+                    }
+
+                    // Check if iframe is loaded already
+                    if (gameIframe.contentDocument && 
+                        gameIframe.contentDocument.readyState === 'complete') {
+                        injectWhenReady();
+                    } else {
+                        // If not loaded, wait for it
+                        gameIframe.addEventListener('load', injectWhenReady);
+                    }
                 } catch (error) {
-                    // If direct injection fails, provide the console method as fallback
-                    console.error('Direct injection failed, using fallback:', error);
-                    const consoleScript = `
-                        const script = document.createElement('script');
-                        script.textContent = ${JSON.stringify(code)};
-                        document.head.appendChild(script);
-                    `;
-                    
-                    showResultMessage(`
-                        Due to browser security restrictions, please run this code in your browser console while on the game page:
-                        <pre>${consoleScript}</pre>
-                        <button id="copy-console-code">Copy Console Code</button>
-                    `, false);
-                    
-                    // Add event listener to the copy button
-                    setTimeout(() => {
-                        const copyConsoleButton = document.getElementById('copy-console-code');
-                        if (copyConsoleButton) {
-                            copyConsoleButton.addEventListener('click', () => {
-                                navigator.clipboard.writeText(consoleScript)
-                                    .then(() => alert('Console code copied to clipboard!'))
-                                    .catch(err => console.error('Failed to copy:', err));
-                            });
-                        }
-                    }, 100);
+                    console.error('Error setting up injection:', error);
+                    showResultMessage(`Error: ${error.message}. Try refreshing the game first.`, true);
                 }
             }
             
-            // Improved CSS injection function
+            // Improved CSS injection function with better error handling
             function injectCssIntoIframe(css) {
-                if (!css) return;
+                if (!css) {
+                    showResultMessage('No CSS to inject', true);
+                    return;
+                }
                 
+                if (!gameIframe || !gameIframe.contentWindow) {
+                    showResultMessage('Game iframe is not accessible', true);
+                    return;
+                }
+
                 try {
-                    // Create a unique ID for communication
-                    const messageId = 'highspell-ui-mod-css-' + Date.now();
-                    
-                    // Create a script element that will inject our CSS through postMessage
-                    const script = document.createElement('script');
-                    script.textContent = `
-                        (function() {
-                            // Listen for our specific message
-                            window.addEventListener('message', function(event) {
-                                if (event.data && event.data.type === 'HIGHSPELL_UI_MOD_CSS' && event.data.id === '${messageId}') {
-                                    try {
-                                        // Create and add the style element
-                                        const style = document.createElement('style');
-                                        style.textContent = event.data.css;
-                                        document.head.appendChild(style);
-                                        
-                                        // Send success message back
-                                        window.parent.postMessage({
-                                            type: 'HIGHSPELL_UI_MOD_CSS_RESULT',
-                                            id: '${messageId}',
-                                            success: true
-                                        }, '*');
-                                    } catch (error) {
-                                        // Send error message back
-                                        window.parent.postMessage({
-                                            type: 'HIGHSPELL_UI_MOD_CSS_RESULT',
-                                            id: '${messageId}',
-                                            success: false,
-                                            error: error.message
-                                        }, '*');
-                                    }
-                                }
-                            });
-                        })();
-                    `;
-                    
-                    // Add a listener for the response
-                    window.addEventListener('message', function responseHandler(event) {
-                        if (event.data && event.data.type === 'HIGHSPELL_UI_MOD_CSS_RESULT' && event.data.id === messageId) {
-                            // Remove this listener once we get our response
-                            window.removeEventListener('message', responseHandler);
-                            
-                            if (event.data.success) {
-                                showResultMessage('CSS applied successfully!', false);
-                            } else {
-                                showResultMessage(`Error applying CSS: ${event.data.error}`, true);
+                    // Handle iframe content loading
+                    function injectCssWhenReady() {
+                        try {
+                            // Check if iframe is loaded and accessible
+                            if (!gameIframe.contentWindow || !gameIframe.contentDocument) {
+                                throw new Error("Cannot access iframe content");
                             }
+
+                            // Directly inject CSS into iframe
+                            const style = gameIframe.contentDocument.createElement('style');
+                            style.textContent = css;
+                            gameIframe.contentDocument.head.appendChild(style);
+                            
+                            showResultMessage('CSS applied successfully!', false);
+                        } catch (error) {
+                            console.error('CSS injection error:', error);
+                            
+                            // Fallback: try using the console method
+                            const consoleScript = `
+                                const style = document.createElement('style');
+                                style.textContent = ${JSON.stringify(css)};
+                                document.head.appendChild(style);
+                            `;
+                            
+                            showResultMessage(`
+                                Due to security restrictions, please run this code in your browser console:
+                                <pre>${consoleScript}</pre>
+                                <button id="copy-console-css">Copy Console Code</button>
+                            `, false);
+                            
+                            // Add event listener to the copy button
+                            setTimeout(() => {
+                                const copyConsoleButton = document.getElementById('copy-console-css');
+                                if (copyConsoleButton) {
+                                    copyConsoleButton.addEventListener('click', () => {
+                                        navigator.clipboard.writeText(consoleScript)
+                                            .then(() => alert('Console code copied to clipboard!'))
+                                            .catch(err => console.error('Failed to copy:', err));
+                                    });
+                                }
+                            }, 100);
                         }
-                    });
-                    
-                    // Inject the listener script
-                    gameIframe.contentWindow.postMessage({
-                        type: 'INJECT_SCRIPT',
-                        script: script.textContent
-                    }, '*');
-                    
-                    // Send the CSS to apply
-                    setTimeout(() => {
-                        gameIframe.contentWindow.postMessage({
-                            type: 'HIGHSPELL_UI_MOD_CSS',
-                            id: messageId,
-                            css: css
-                        }, '*');
-                    }, 100);
-                    
+                    }
+
+                    // Check if iframe is loaded already
+                    if (gameIframe.contentDocument && 
+                        gameIframe.contentDocument.readyState === 'complete') {
+                        injectCssWhenReady();
+                    } else {
+                        // If not loaded, wait for it
+                        gameIframe.addEventListener('load', injectCssWhenReady);
+                    }
                 } catch (error) {
-                    // If direct injection fails, provide the console method as fallback
-                    console.error('Direct CSS injection failed, using fallback:', error);
-                    const consoleScript = `
-                        const style = document.createElement('style');
-                        style.textContent = ${JSON.stringify(css)};
-                        document.head.appendChild(style);
-                    `;
-                    
-                    showResultMessage(`
-                        Due to browser security restrictions, please run this code in your browser console while on the game page:
-                        <pre>${consoleScript}</pre>
-                        <button id="copy-console-code">Copy Console Code</button>
-                    `, false);
-                    
-                    // Add event listener to the copy button
-                    setTimeout(() => {
-                        const copyConsoleButton = document.getElementById('copy-console-code');
-                        if (copyConsoleButton) {
-                            copyConsoleButton.addEventListener('click', () => {
-                                navigator.clipboard.writeText(consoleScript)
-                                    .then(() => alert('Console code copied to clipboard!'))
-                                    .catch(err => console.error('Failed to copy:', err));
-                            });
-                        }
-                    }, 100);
+                    console.error('Error setting up CSS injection:', error);
+                    showResultMessage(`Error: ${error.message}. Try refreshing the game first.`, true);
                 }
             }
             
@@ -930,48 +892,68 @@ ${response.cssCode || '/* No CSS provided */'}
             }
             
             // Copy button functionality
-            copyCodeButton.addEventListener('click', () => {
-                navigator.clipboard.writeText(codeEditor.value)
-                    .then(() => {
-                        showResultMessage('Code copied to clipboard!', false);
-                    })
-                    .catch(err => {
-                        console.error('Failed to copy:', err);
-                        showResultMessage('Failed to copy code.', true);
-                    });
-            });
+            if (copyCodeButton) {
+                copyCodeButton.addEventListener('click', () => {
+                    if (!codeEditor || !codeEditor.value) {
+                        showResultMessage('No code to copy', true);
+                        return;
+                    }
+                    
+                    navigator.clipboard.writeText(codeEditor.value)
+                        .then(() => {
+                            showResultMessage('Code copied to clipboard!', false);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy:', err);
+                            showResultMessage('Failed to copy code.', true);
+                        });
+                });
+            }
             
             // Create bookmarklet functionality
-            createBookmarkletButton.addEventListener('click', () => {
-                const code = codeEditor.value.trim();
-                if (!code) {
-                    showResultMessage('No code to create bookmarklet', true);
-                    return;
-                }
-                
-                try {
-                    // Create bookmarklet code
-                    const bookmarkletCode = `javascript:(function(){${encodeURIComponent(code)}})();`;
-                    bookmarkletLink.href = bookmarkletCode;
-                    bookmarkletContainer.style.display = 'block';
-                    showResultMessage('Bookmarklet created! Drag the link to your bookmarks bar.', false);
-                } catch (error) {
-                    console.error('Error creating bookmarklet:', error);
-                    showResultMessage(`Error creating bookmarklet: ${error.message}`, true);
-                }
-            });
+            if (createBookmarkletButton) {
+                createBookmarkletButton.addEventListener('click', () => {
+                    if (!codeEditor || !bookmarkletLink) {
+                        showResultMessage('Required elements not found', true);
+                        return;
+                    }
+                    
+                    const code = codeEditor.value.trim();
+                    if (!code) {
+                        showResultMessage('No code to create bookmarklet', true);
+                        return;
+                    }
+                    
+                    try {
+                        // Create bookmarklet code
+                        const bookmarkletCode = `javascript:(function(){${encodeURIComponent(code)}})();`;
+                        bookmarkletLink.href = bookmarkletCode;
+                        bookmarkletContainer.style.display = 'block';
+                        showResultMessage('Bookmarklet created! Drag the link to your bookmarks bar.', false);
+                    } catch (error) {
+                        console.error('Error creating bookmarklet:', error);
+                        showResultMessage(`Error creating bookmarklet: ${error.message}`, true);
+                    }
+                });
+            }
             
             // Download userscript functionality
-            downloadUserscriptButton.addEventListener('click', () => {
-                const code = codeEditor.value.trim();
-                if (!code) {
-                    showResultMessage('No code to create userscript', true);
-                    return;
-                }
-                
-                try {
-                    // Create userscript content
-                    const userscriptContent = `// ==UserScript==
+            if (downloadUserscriptButton) {
+                downloadUserscriptButton.addEventListener('click', () => {
+                    if (!codeEditor) {
+                        showResultMessage('Code editor not found', true);
+                        return;
+                    }
+                    
+                    const code = codeEditor.value.trim();
+                    if (!code) {
+                        showResultMessage('No code to create userscript', true);
+                        return;
+                    }
+                    
+                    try {
+                        // Create userscript content
+                        const userscriptContent = `// ==UserScript==
 // @name         Highspell UI Modification
 // @namespace    http://highspell.com/
 // @version      1.0
@@ -984,46 +966,58 @@ ${response.cssCode || '/* No CSS provided */'}
 (function() {
     'use strict';
     
-    ${code}
+    // Wait for the game to load before applying modifications
+    const checkGameLoaded = setInterval(function() {
+        if (document.readyState === 'complete') {
+            clearInterval(checkGameLoaded);
+            runModifications();
+        }
+    }, 500);
+    
+    function runModifications() {
+        try {
+            ${code}
+        } catch (error) {
+            console.error('Error applying Highspell UI modifications:', error);
+        }
+    }
 })();`;
-                    
-                    // Create download link
-                    const blob = new Blob([userscriptContent], { type: 'text/javascript' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'highspell_ui_mod.user.js';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    
-                    showResultMessage('Userscript downloaded! Install it in Tampermonkey or another userscript manager.', false);
-                } catch (error) {
-                    console.error('Error downloading userscript:', error);
-                    showResultMessage(`Error downloading userscript: ${error.message}`, true);
-                }
-            });
+                        
+                        // Create download link
+                        const blob = new Blob([userscriptContent], { type: 'text/javascript' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'highspell_ui_mod.user.js';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        
+                        showResultMessage('Userscript downloaded! Install it in Tampermonkey or another userscript manager.', false);
+                    } catch (error) {
+                        console.error('Error downloading userscript:', error);
+                        showResultMessage(`Error downloading userscript: ${error.message}`, true);
+                    }
+                });
+            }
             
             // Helper to show result messages
             function showResultMessage(message, isError) {
+                if (!resultMessage) {
+                    console.error('Result message element not found');
+                    alert(message);
+                    return;
+                }
+                
                 resultMessage.innerHTML = message;
                 resultMessage.className = isError ? 'error-message' : 'success-message';
                 resultMessage.style.display = 'block';
             }
             
-            // Setup listener for script injections from iframe
-            window.addEventListener('message', function(event) {
-                if (event.data && event.data.type === 'INJECT_SCRIPT') {
-                    try {
-                        // Create and execute the script in the iframe
-                        const script = document.createElement('script');
-                        script.textContent = event.data.script;
-                        gameIframe.contentDocument.head.appendChild(script);
-                    } catch (error) {
-                        console.error('Error injecting script into iframe:', error);
-                    }
-                }
+            // Wait for the iframe to load before trying to access its content
+            gameIframe.addEventListener('load', function() {
+                console.log('Game iframe loaded successfully');
             });
         });
     </script>
